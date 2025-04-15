@@ -20,7 +20,7 @@ This is a Python tool to automatically detect and label YouTube comments that pr
 2. Install depedencies.
 
     ```sh
-    pip install requirements.txt
+    pip install -r requirements.txt
     ```
 
 3. Replace API keys to `config.json`:
