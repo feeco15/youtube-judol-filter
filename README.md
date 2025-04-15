@@ -1,6 +1,6 @@
 <h1 align="center">Judol Comment Filter on Youtube</h1>
 
-This is a Python tool to automatically detect and label YouTube comments that promote online gambling (judi online / judol) using the YouTube Data API and DeepSeek's LLM via OpenRouter.
+This is a Python tool to automatically detect and label YouTube comments that promote online gambling (judi online) using the YouTube Data API and DeepSeek's LLM via OpenRouter.
 
 ## Prerequisite
 
