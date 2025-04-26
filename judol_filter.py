@@ -4,11 +4,15 @@ import json
 import time
 import sys
 import pandas as pd
+from tqdm import tqdm
 from pathlib import Path
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs
-from tqdm import tqdm
 from colorama import init, Fore
+from urllib.parse import urlparse, parse_qs
+from googleapiclient.discovery import build
+
+from token_handler import load_token, auth_yt, validate_token
+
 
 init(autoreset=True)
 
@@ -60,8 +64,16 @@ def scrape_comments(video_id, api_key, limit=100):
         data = response.json()
 
         for item in data.get("items", []):
-            comment = item["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
-            comments.append(comment)
+            comment = item["snippet"]["topLevelComment"]["snippet"]
+            get_text = comment["textDisplay"]
+            get_id = item["id"]
+            
+            comments.append(
+                {
+                    "id": get_id,
+                    "text": get_text
+                }
+            )
             total_scraped += 1
             
             sys.stdout.write(f"\r[+] Scraping comments... [{total_scraped}/{limit}]")
@@ -74,6 +86,8 @@ def scrape_comments(video_id, api_key, limit=100):
     return comments
 
 def auto_labeling(comments_batch, deepseek_api_key):
+    
+    # you can custom this prompt to get better results
     prompt_lines = [
         "Classify the following YouTube comments as promoting judi online (online gambling) or not.",
         "Add the sequence and (only) reply by number 1 (yes) or 0 (no) every sentence each line.",
@@ -123,12 +137,6 @@ def auto_labeling(comments_batch, deepseek_api_key):
                 if "." in line:
                     line = str(line.split(".", 1)[1].strip())
                 labels.append(1 if line == "1" else 0)
-                    # if line.endswith(1):
-                    #     labels.append(1)
-                    # elif line.endswith(0):
-                    #     labels.append(0)
-                    # else:
-                    #     labels.append(None)
 
             if len(labels) < len(comments_batch):
                 labels.extend([None] * (len(comments_batch) - len(labels)))
@@ -142,6 +150,18 @@ def auto_labeling(comments_batch, deepseek_api_key):
     except Exception as e:
         print(Fore.RED + f"\nDeepSeek exception: {e}")
         return [None] * len(comments_batch)
+
+def auto_delete_comments(get_id, cred):
+    try:
+        youtube = build("youtube", "v3", credentials=cred)
+        youtube.comments().setModerationStatus(
+            id = get_id,
+            moderationStatus="rejected"
+        ).execute()
+        return True
+    except Exception as e:
+        print(Fore.RED + f"[-] Failed to delete comment {get_id}: {e}")
+        return False
 
 def save_to_csv(comments, labels, output_file):
     if len(comments) != len(labels):
@@ -168,9 +188,11 @@ def save_to_csv(comments, labels, output_file):
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape and detect judol YouTube comments")
+    parser.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS, help="Show this help msg")
     parser.add_argument("-u", "--url", required=True, help="YouTube video URL")
     parser.add_argument("-o", "--output", help="Output CSV file")
     parser.add_argument("-s", "--limit-scrap", type=int, default=100, help="Comment limit (default: 100)")
+    parser.add_argument("-d", "--delete-comments", action="store_true", help="Enable auto deletion for detected comments")
     args = parser.parse_args()
 
     youtube_api_key, deepseek_api_key = load_api_keys()
@@ -178,6 +200,20 @@ def main():
     if not video_id:
         print("Invalid YouTube URL.")
         return
+
+    get_credentials = None
+    if args.delete_comments:
+        print("Initializing login, please wait...\n")
+        get_credentials = load_token()
+
+        if not get_credentials or not validate_token(get_credentials):
+            get_credentials = auth_yt()
+
+        if get_credentials and get_credentials.valid:
+            print(Fore.GREEN + "ok")
+        else:
+            print(Fore.RED + "failed")
+            return
 
     output_path = Path("outputs")
     output_path.mkdir(parents=True, exist_ok=True)
@@ -196,11 +232,21 @@ def main():
     labels = []
     for i in tqdm(range(0, len(comments), 20), desc="[Labeling]"):
         batch = comments[i:i+20]
-        batch_labels = auto_labeling(batch, deepseek_api_key)
+        text = [c["text"] for c in batch]
+        batch_labels = auto_labeling(text, deepseek_api_key)
         labels.extend(batch_labels)
         time.sleep(5)
 
-    save_to_csv(comments, labels, output_file)
+    print(Fore.YELLOW + "[+] Deleting flagged comments...")
+    for idx, (comment, label) in enumerate(zip(comments, labels)):
+        if label == 1:
+            removed_comm = f"{idx+1}: {comment['text'][:50]}"
+            deleted = auto_delete_comments(comment["id"], get_credentials)
+            
+            if deleted:
+                print(Fore.GREEN + "success remove comments")
+
+    save_to_csv([c["text"] for c in comments], labels, output_file)
 
 
 main() if __name__ == "__main__" else exit(1)

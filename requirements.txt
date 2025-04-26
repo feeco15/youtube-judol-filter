@@ -2,3 +2,5 @@ tqdm
 pandas
 requests
 colorama
+webbrowser
+google-api-python-client
