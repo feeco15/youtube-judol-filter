@@ -5,11 +5,7 @@ A Python tool to automatically detect and label YouTube comments that promote **
 - YouTube Data API v3
 - Optional OAuth login for auto-deleting flagged comments
 
----
-
 ## 📦 Prerequisite
-
----
 
 ## Requirements
 
@@ -17,8 +13,6 @@ A Python tool to automatically detect and label YouTube comments that promote **
 - [YouTube Data API v3](https://console.cloud.google.com)
 - [YouTube OAuth 2.0 Setup](https://console.cloud.google.com)
 - [DeepSeek API via OpenRouter](https://openrouter.ai/deepseek/deepseek-chat:free)
-
----
 
 ## Setup
 
@@ -46,8 +40,6 @@ A Python tool to automatically detect and label YouTube comments that promote **
 
 4. Add your `client_secret.json` in the root directory for YouTube OAuth login.
 
----
-
 ## Parameters
 
 ```text
@@ -57,8 +49,6 @@ Flag / Option
     -o, --output                        Output CSV file path, auto-generated if not set
     -d, --delete-comments               Automatically delete flagged comments with login requires
 ```
-
----
 
 ## Usage
 
